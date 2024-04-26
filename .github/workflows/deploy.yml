@@ -8,7 +8,9 @@
   # instead of needing to change this file to switch environments.
   env:
     targetEnv: dev
-
+  
+  permissions: write-all
+  
   # The overall workflow name will be Azure Bicep. This will show up in the
   # GitHub Action page.
   name: Azure Bicep

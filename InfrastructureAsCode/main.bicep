@@ -14,4 +14,99 @@ var registrySku = 'Standard'
 var imageName = 'techboost/dotnetcoreapp'
 var startupCommand = ''
 
-// TODO: complete this script
+// Write configuration settings for an 
+//1. Azure App Service Plan, 
+//2. a Web App, 
+//3. Application Insights and 
+//4. Azure Container Registry 
+// in the resource group provided above
+
+resource appServicePlan 'Microsoft.Web/serverFarms@2020-12-01' = {
+  name: appServicePlanName
+  location: location
+  kind: 'linux'
+  properties: {
+    reserved: true
+  }
+  sku: {
+    name: sku
+  }
+}
+
+resource appServiceApp 'Microsoft.Web/sites@2020-12-01' = {
+  name: webAppName
+  location: location
+  properties: {
+    serverFarmId: appServicePlan.id
+    httpsOnly: true
+    clientAffinityEnabled: false
+    siteConfig: {
+      linuxFxVersion: 'DOCKER|${containerRegistry.name}.azurecr.io/${uniqueString(resourceGroup().id)}/${imageName}'
+      http20Enabled: true
+      minTlsVersion: '1.2'
+      appCommandLine: startupCommand
+      appSettings: [
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://${containerRegistry.name}.azurecr.io'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: containerRegistry.name
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: containerRegistry.listCredentials().passwords[0].value
+        }
+        {
+          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+          value: appInsights.properties.InstrumentationKey
+        }
+        ]
+      }
+    }
+}
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
+  name: appInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalyticsWorkspace.id
+  }
+} 
+
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2020-11-01-preview' = {
+  name: registryName
+  location: location
+  sku: {
+    name: registrySku
+  }
+  properties: {
+    adminUserEnabled: true
+  }
+} 
+
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12-01-preview' = {
+  name: logAnalyticsName
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 90
+    workspaceCapping: {
+      dailyQuotaGb: 1
+    }
+  }
+}
+
+
+output application_name string = appServiceApp.name
+output application_url string = appServiceApp.properties.hostNames[0]
+output container_registry_name string = containerRegistry.name
